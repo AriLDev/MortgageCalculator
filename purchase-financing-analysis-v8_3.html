@@ -1,0 +1,1716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Purchase Financing Analysis v8 · Monte Carlo</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0C0F14; --card: #151920; --border: #252B36;
+  --accent: #C8A44E; --accent-muted: #8B7535;
+  --green: #3AA675; --red: #D4564E; --blue: #4A8FCC;
+  --text: #E8E4DC; --text-muted: #8B8A87; --text-dim: #5A5957;
+  --winner-bg: #1E2D1E; --winner-border: #3AA675;
+  --orange: #D4944E;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: 'DM Sans', 'Helvetica Neue', sans-serif;
+  padding: 20px 16px; max-width: 800px; margin: 0 auto;
+  -webkit-text-size-adjust: 100%;
+}
+.mono { font-family: 'JetBrains Mono', monospace; }
+.card { background: var(--card); border-radius: 8px; border: 1px solid var(--border); padding: 16px 12px; margin-bottom: 20px; }
+.section-title { color: var(--accent); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+.section-sub { color: var(--text-muted); font-size: 11px; margin-bottom: 14px; }
+h1 { font-size: 20px; font-weight: 800; color: var(--accent); letter-spacing: -0.02em; line-height: 1.2; }
+.subtitle { color: var(--text-muted); font-size: 12px; margin-top: 4px; }
+
+.slider-group { margin-bottom: 14px; }
+.slider-header { display: flex; justify-content: space-between; margin-bottom: 5px; }
+.slider-label { color: var(--text-muted); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
+.slider-value { color: var(--accent); font-size: 12px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+input[type="range"] {
+  width: 100%; cursor: pointer; -webkit-appearance: none; appearance: none;
+  height: 6px; background: var(--border); border-radius: 3px; outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); cursor: pointer;
+}
+
+.grid-head { display: grid; align-items: center; }
+.grid-head-header { border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 4px; }
+.grid-head-header div { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding-right: 4px; }
+.grid-head-header div:first-child { color: var(--text-dim); }
+.metric-row { border-bottom: 1px solid var(--border); padding: 9px 0; }
+.metric-row .label { color: var(--text-muted); font-size: 11px; padding-right: 6px; }
+.metric-row .val { text-align: right; font-size: 12px; font-family: 'JetBrains Mono', monospace; color: var(--text); padding-right: 4px; }
+.metric-row .val.best { color: var(--green); font-weight: 700; }
+.wealth-row { padding: 14px 0 6px; border-top: 2px solid var(--accent); margin-top: 4px; }
+.wealth-row .label { color: var(--accent); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+.wealth-row .val { text-align: right; font-size: 14px; font-family: 'JetBrains Mono', monospace; font-weight: 800; padding-right: 4px; }
+.winner-banner { margin-top: 12px; padding: 10px 12px; border-radius: 6px; background: var(--winner-bg); border: 1px solid var(--winner-border); font-size: 13px; color: var(--green); text-align: center; }
+
+.stress-scenario { margin-bottom: 14px; }
+.stress-header { display: flex; justify-content: space-between; margin-bottom: 4px; }
+.stress-name { color: var(--text); font-size: 12px; font-weight: 600; }
+.stress-sub { color: var(--text-dim); font-size: 10px; }
+.bar-row { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+.bar-label { width: 55px; font-size: 9px; color: var(--text-muted); text-align: right; flex-shrink: 0; }
+.bar-track { flex: 1; height: 16px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+.bar-val { width: 68px; font-size: 10px; text-align: right; flex-shrink: 0; font-family: 'JetBrains Mono', monospace; }
+
+.be-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.be-box { flex: 1; min-width: 55px; text-align: center; padding: 10px 6px; background: var(--bg); border-radius: 6px; border: 1px solid var(--border); }
+.be-label { color: var(--text-muted); font-size: 10px; margin-bottom: 4px; }
+.be-value { color: var(--accent); font-size: 15px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+
+.sens-table { width: 100%; border-collapse: collapse; font-size: 10px; font-family: 'JetBrains Mono', monospace; }
+.sens-table th { padding: 6px 4px; color: var(--text-muted); text-align: center; border-bottom: 1px solid var(--border); font-size: 9px; font-weight: 600; }
+.sens-table th:first-child, .sens-table th:nth-child(2) { text-align: left; }
+.sens-table td { padding: 4px 3px; text-align: center; border: 1px solid var(--bg); border-radius: 2px; }
+.sens-table .hold-cell { padding: 4px 6px; color: var(--accent); font-weight: 700; vertical-align: middle; border-right: 1px solid var(--border); }
+.sens-table .ret-cell { padding: 4px 6px; color: var(--text-muted); text-align: left; }
+.sens-cell-cash { background: #1A1A2E; color: var(--blue); font-weight: 600; font-size: 9px; }
+.sens-cell-50 { background: var(--winner-bg); color: var(--green); font-weight: 600; font-size: 9px; }
+.sens-cell-20 { background: #1E2420; color: #B8CC52; font-weight: 600; font-size: 9px; }
+.sens-cell-io { background: #2A1E1E; color: var(--orange); font-weight: 600; font-size: 9px; }
+.sens-adv { font-size: 8px; opacity: 0.7; margin-top: 1px; }
+
+.legend { display: flex; gap: 16px; margin-top: 12px; justify-content: center; flex-wrap: wrap; }
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 2px; }
+.legend-label { font-size: 10px; }
+
+.risk-item { margin-bottom: 12px; }
+.risk-title { color: var(--text); font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+.risk-desc { color: var(--text-muted); font-size: 11px; line-height: 1.5; }
+
+.cashflow-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.cashflow-label { color: var(--text-muted); font-size: 11px; }
+.cashflow-vals { display: flex; gap: 12px; }
+.cashflow-val { font-size: 11px; font-family: 'JetBrains Mono', monospace; min-width: 72px; text-align: right; }
+
+.section-divider { color: var(--accent-muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; margin: 8px 0 4px; padding-top: 6px; border-top: 1px dashed var(--border); }
+
+.toggle-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.toggle-label { color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+.toggle-btn {
+  background: var(--border); border: none; border-radius: 12px; width: 44px; height: 24px;
+  position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0;
+}
+.toggle-btn.on { background: var(--green); }
+.toggle-btn::after {
+  content: ''; position: absolute; top: 3px; left: 3px;
+  width: 18px; height: 18px; border-radius: 50%; background: var(--text);
+  transition: transform 0.2s;
+}
+.toggle-btn.on::after { transform: translateX(20px); }
+
+.footer { text-align: center; color: var(--text-dim); font-size: 10px; padding: 8px 0 20px; line-height: 1.6; }
+
+.mc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; margin-top: 10px; }
+.mc-box { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px 8px; text-align: center; }
+.mc-label { color: var(--text-muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+.mc-value { color: var(--accent); font-size: 15px; font-weight: 800; font-family: 'JetBrains Mono', monospace; }
+.mc-row { display: grid; grid-template-columns: 1.3fr 0.8fr 0.8fr 0.8fr; gap: 4px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border); }
+.mc-row div { font-size: 10px; }
+.mc-row .mc-name { color: var(--text-muted); }
+.mc-row .mc-num { text-align: right; font-family: 'JetBrains Mono', monospace; color: var(--text); }
+.mc-row.header div { color: var(--accent); font-weight: 700; text-transform: uppercase; font-size: 9px; }
+
+.dollar-input-group { margin-bottom: 14px; }
+.dollar-input-row { display: flex; justify-content: space-between; align-items: center; }
+.dollar-input {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--accent); font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 600;
+  padding: 8px 10px; width: 140px; text-align: right; outline: none;
+  -webkit-appearance: none; appearance: none;
+}
+.dollar-input:focus { border-color: var(--accent); }
+.dollar-input.invalid { border-color: var(--red); color: var(--red); }
+
+/* Tooltips */
+.has-tip { position: relative; cursor: help; border-bottom: 1px dotted var(--text-dim); }
+.has-tip .tip { display: none; position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+  background: #1C2029; border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px;
+  font-size: 10px; color: var(--text-muted); white-space: normal; width: 220px; z-index: 10;
+  line-height: 1.5; box-shadow: 0 4px 12px rgba(0,0,0,0.4); pointer-events: none; }
+.has-tip:hover .tip, .has-tip:focus .tip { display: block; }
+
+/* Model Notes accordion */
+.notes-toggle { display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding: 10px 0; }
+.notes-toggle-label { color: var(--accent); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+.notes-chevron { color: var(--accent); font-size: 14px; transition: transform 0.2s; }
+.notes-chevron.open { transform: rotate(180deg); }
+.notes-body { display: none; padding-bottom: 8px; }
+.notes-body.open { display: block; }
+.notes-section { margin-bottom: 12px; }
+.notes-section-title { color: var(--text); font-size: 11px; font-weight: 700; margin-bottom: 4px; }
+.notes-item { color: var(--text-muted); font-size: 10px; line-height: 1.6; margin-bottom: 6px; padding-left: 10px; border-left: 2px solid var(--border); }
+.notes-item strong { color: var(--text-dim); font-weight: 600; }
+
+/* MC histogram */
+.mc-histogram { margin-top: 14px; }
+.mc-prob-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-top: 10px; }
+.mc-prob-box { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px; text-align: center; }
+.mc-prob-label { color: var(--text-muted); font-size: 9px; text-transform: uppercase; margin-bottom: 3px; }
+.mc-prob-value { font-size: 14px; font-weight: 800; font-family: 'JetBrains Mono', monospace; }
+
+/* Export bar */
+.export-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.export-btn {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text-muted);
+  font-size: 10px; padding: 6px 12px; cursor: pointer; transition: all 0.15s;
+  font-family: 'DM Sans', sans-serif; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.export-btn:hover { border-color: var(--accent); color: var(--accent); }
+.export-btn.copied { border-color: var(--green); color: var(--green); }
+
+/* Mobile polish */
+.scroll-hint { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.scroll-hint::-webkit-scrollbar { height: 4px; }
+.scroll-hint::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* Changelog modal */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; }
+.modal-overlay.show { display: flex; justify-content: center; align-items: center; }
+.modal { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; max-width: 420px; width: 90%; max-height: 80vh; overflow-y: auto; }
+.modal h2 { color: var(--accent); font-size: 16px; margin-bottom: 12px; }
+.modal p, .modal li { color: var(--text-muted); font-size: 11px; line-height: 1.6; }
+.modal ul { padding-left: 16px; margin-bottom: 10px; }
+.modal-close { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--text-muted); padding: 6px 16px; cursor: pointer; margin-top: 10px; font-family: 'DM Sans', sans-serif; }
+.modal-close:hover { border-color: var(--accent); color: var(--accent); }
+
+.version-link { color: var(--text-dim); font-size: 10px; cursor: pointer; border-bottom: 1px dotted var(--text-dim); }
+.version-link:hover { color: var(--accent); }
+/* #21: Mobile strategy name abbreviation */
+.strat-full { display: inline; }
+.strat-short { display: none; }
+@media (max-width: 520px) {
+  .strat-full { display: none; }
+  .strat-short { display: inline; }
+  .grid-head-header div { font-size: 8px; }
+  .metric-row .val { font-size: 10px; padding-right: 2px; }
+  .metric-row .label { font-size: 10px; }
+  .wealth-row .val { font-size: 12px; }
+}
+</style>
+</head>
+<body>
+
+<div style="margin-bottom:24px;display:flex;justify-content:space-between;align-items:flex-start">
+  <div>
+    <h1>Purchase Financing Analysis <span class="version-link" onclick="document.getElementById('changelog-modal').classList.add('show')">v8</span></h1>
+    <p class="subtitle">Denver Hilltop/Crestmoor · 37% Fed + 4.4% CO · $750K MID Cap</p>
+  </div>
+  <div class="export-bar" style="margin-top:4px">
+    <button class="export-btn" id="btn-share" title="Copy shareable URL">Share</button>
+    <button class="export-btn" id="btn-csv" title="Export MC distributions as CSV">CSV</button>
+  </div>
+</div>
+
+<div class="card" id="controls">
+  <div style="color:var(--text-dim);font-size:10px;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:12px">Core Assumptions</div>
+  <div id="sliders-core"></div>
+  <div class="section-divider">Costs & Fees</div>
+  <div id="sliders-costs"></div>
+  <div class="section-divider">Advanced</div>
+  <div id="sliders-adv"></div>
+  <div class="section-divider">ARM Reset Schedule</div>
+  <div id="sliders-arm"></div>
+  <div class="section-divider">Monte Carlo</div>
+  <div id="sliders-mc"></div>
+  <div id="toggles"></div>
+  <div id="refi-section"></div>
+</div>
+
+<div class="card" id="main-table"></div>
+<div class="card" id="cashflow"></div>
+<div class="card" id="stress-test"></div>
+<div class="card" id="trajectory"></div>
+<div class="card" id="breakeven"></div>
+<div class="card" id="sensitivity"></div>
+<div class="card" id="monte-carlo"></div>
+<div class="card" id="risks"></div>
+<div class="card" id="model-notes"></div>
+<div class="footer" id="footer-text"></div>
+
+<!-- Changelog Modal -->
+<div class="modal-overlay" id="changelog-modal" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="modal">
+    <h2>Changelog</h2>
+    <p style="color:var(--accent);font-weight:600;margin-bottom:6px">v8 — Analytical Depth & MC Engine Upgrade</p>
+    <ul>
+      <li><strong>Stochastic ARM Index (#1):</strong> MC engine now simulates correlated SOFR paths. Rate volatility and rate-equity correlation are configurable. ARM resets use per-year stochastic index rather than a fixed value.</li>
+      <li><strong>Decision Summary Fix (#2):</strong> MC median is now primary "Best Expected Outcome" (captures geometric compounding). Deterministic case correctly labeled as optimistic.</li>
+      <li><strong>Negative Cashflow (#3):</strong> Portfolio calculation handles negative monthly contributions robustly — portfolio floors at zero, contributions and withdrawals tracked separately.</li>
+      <li><strong>Computed MID Realization (#4):</strong> Auto-computes effective MID benefit vs. standard deduction + other itemized deductions. Toggle to override with manual slider.</li>
+      <li><strong>Variable Tax Drag (#7):</strong> Portfolio tax drag varies with annual returns — higher in up years (distributions), near-zero in down years (tax-loss harvesting).</li>
+      <li><strong>Assessment Lag (#8):</strong> Property tax based on 2-year-lagged assessed value, matching Colorado reassessment schedule.</li>
+      <li><strong>Wealth Difference Distribution (#11):</strong> New histogram showing per-path (best leverage − cash) with zero line, median annotation, and P(loss).</li>
+      <li><strong>Wealth Trajectory (#12):</strong> Year-by-year net wealth chart showing when leverage crosses over cash and where maximum regret occurs.</li>
+      <li><strong>Scaled MC Thresholds (#15):</strong> Probability thresholds now scale with purchase price (1.5%, 3%, 7.5%) instead of fixed $50K/$100K/$250K.</li>
+      <li><strong>Breakeven Color-Coding (#19):</strong> Green/red indicators show whether current return assumption exceeds each breakeven threshold, with margin displayed.</li>
+      <li><strong>Custom Stress Scenario (#20):</strong> User-configurable market return and home appreciation with inline sliders in the stress test section.</li>
+      <li><strong>Mobile Abbreviations (#21):</strong> Strategy names abbreviate on narrow viewports to prevent table overflow.</li>
+    </ul>
+    <p style="color:var(--accent);font-weight:600;margin-bottom:6px">v7 — Financing Decision Model Updates</p>
+    <ul>
+      <li><strong>Independent Down Payments:</strong> ARM, fixed, and interest-only strategies now use separate down-payment inputs.</li>
+      <li><strong>MID Realization Factor:</strong> Mortgage-interest deduction benefits are haircut for real-world itemization/SALT effects.</li>
+      <li><strong>Binary-Search Breakevens:</strong> Breakeven investment returns are now solved with a proper binary search across holding periods.</li>
+      <li><strong>Decision Summary:</strong> Expected-value, risk-adjusted, and sleep-well winners are displayed separately.</li>
+      <li><strong>Updated Defaults:</strong> Portfolio tax drag, volatility, correlation, Monte Carlo runs, and down-payment assumptions updated.</li>
+    </ul>
+    <p style="color:var(--accent);font-weight:600;margin-bottom:6px">v5 — Modeling & UX Overhaul</p>
+    <ul>
+      <li><strong>Dynamic Annual Drags:</strong> Property tax & maintenance now deducted from the portfolio each year rather than as a lump sum at exit. Reduces compounding basis realistically.</li>
+      <li><strong>Full ARM Schedule:</strong> Annual resets after year 7 with periodic (2%/yr) and lifetime (5%) caps, plus index + margin inputs. Feeds through MC volatility engine.</li>
+      <li><strong>Additional Strategy:</strong> Interest-only ARM option added for jumbo buyers.</li>
+      <li><strong>Richer MC Output:</strong> Canvas histogram of wealth distributions, probability of leverage beating cash by >$X thresholds.</li>
+      <li><strong>Assumption Transparency:</strong> Expandable Model Notes panel explaining every rate, limitation, and assumption.</li>
+      <li><strong>Export:</strong> Share URL (base64 state) and CSV export of MC distributions.</li>
+      <li><strong>Input validation:</strong> Dollar fields reject negative values.</li>
+      <li><strong>Tooltips:</strong> Key metrics have hover explanations.</li>
+      <li><strong>Mobile polish:</strong> Horizontal scroll on wide tables with visible scrollbar indicators.</li>
+      <li><strong>Performance:</strong> Memoized scenario calculations to avoid redundant re-runs in stress/sensitivity.</li>
+    </ul>
+    <p style="color:var(--accent);font-weight:600;margin-bottom:6px">v4 — Monte Carlo & Sensitivity</p>
+    <ul>
+      <li>Monte Carlo simulation with correlated return paths</li>
+      <li>Sensitivity matrix (hold × return × appreciation)</li>
+      <li>Stress testing across market scenarios</li>
+      <li>Breakeven threshold analysis</li>
+      <li>ARM reset caps and refinance modeling</li>
+    </ul>
+    <button class="modal-close" onclick="document.getElementById('changelog-modal').classList.remove('show')">Close</button>
+  </div>
+</div>
+
+<script>
+const TAX_RATE = 0.414;
+const MID_CAP = 750000;
+const INVEST_TAX = 0.282;
+const CAP_GAINS_EXCL = 500000;
+
+const state = {
+  purchasePrice: 3250000,
+  holdYears: 7,
+  homeApprecRate: 0.04,
+  investReturn: 0.09,
+  fixedRate: 0.0645,
+  armRate: 0.05625,
+  customDownPct: 0.40,
+  fixedDownPct: 0.40,
+  ioDownPct: 0.40,
+  closingCostCash: 8500,
+  closingCostFin: 28000,
+  sellingCostPct: 0.05,
+  inflation: 0.03,
+  modelRefi: false,
+  refiYear: 3,
+  refiRate: 0.05,
+  refiCosts: 12000,
+  capGainsExclusion: true,
+  showRealDollars: false,
+  portfolioTaxDrag: 0.0075,
+  midRealization: 0.85,
+  propertyTaxDrag: 0.015,
+  // Computed MID inputs
+  stdDeduction: 30700,   // 2026 MFJ standard deduction
+  otherItemized: 16000,  // SALT cap ($10K) + charitable (~$6K)
+  autoComputeMID: true,
+  // Full ARM reset schedule
+  armIndex: 0.036,       // SOFR ~3.6% as of May 2026
+  armMargin: 0.0275,     // typical jumbo margin
+  armPeriodicCap: 0.02,  // 2% per adjustment
+  armLifetimeCap: 0.05,  // 5% over start rate
+  // Interest-only toggle
+  showInterestOnly: false,
+  ioYears: 10,
+  // MC
+  mcRuns: 5000,
+  mcPortfolioVol: 0.14,
+  mcHomeVol: 0.07,
+  mcCorrelation: 0.20,
+  mcRateVol: 0.012,      // #1: SOFR annual vol (~120bps)
+  mcRatePortCorr: 0.30,  // #1: rate-equity correlation
+  mcSeed: 12345,
+  // Dynamic drags
+  dynamicDrags: true,
+  // Custom stress scenario (#20)
+  customStressIR: 0.06,
+  customStressHA: 0.00,
+};
+
+// --- Memoization cache ---
+const _cache = new Map();
+function cacheKey(p) {
+  const k = JSON.stringify(p, (key, val) => typeof val === 'number' ? Math.round(val * 1e8) / 1e8 : val);
+  return k;
+}
+function runScenariosCached(p) {
+  const k = cacheKey(p);
+  if (_cache.has(k)) return _cache.get(k);
+  const r = runScenarios(p);
+  if (_cache.size > 200) _cache.clear();
+  _cache.set(k, r);
+  return r;
+}
+
+const sliderGroups = {
+  core: [
+    { key:'purchasePrice', label:'Purchase Price', min:2500000, max:5000000, step:50000, fmt:'dollar' },
+    { key:'holdYears', label:'Holding Period (Years)', min:2, max:20, step:1, fmt:'int' },
+    { key:'homeApprecRate', label:'Home Appreciation', min:-0.05, max:0.10, step:0.005, fmt:'pct' },
+    { key:'investReturn', label:'Portfolio Return (Pre-Tax)', min:-0.05, max:0.18, step:0.005, fmt:'pct' },
+    { key:'fixedRate', label:'30-Yr Fixed Jumbo Rate', min:0.035, max:0.09, step:0.00025, fmt:'rate' },
+    { key:'armRate', label:'7/1 ARM Initial Rate', min:0.03, max:0.085, step:0.00025, fmt:'rate' },
+  ],
+  costs: [
+    { key:'closingCostCash', label:'Closing Costs (Cash Buy)', fmt:'dollar', input:true },
+    { key:'closingCostFin', label:'Closing Costs (Financed)', fmt:'dollar', input:true },
+    { key:'sellingCostPct', label:'Selling Costs (Commission+)', min:0.03, max:0.08, step:0.005, fmt:'pct' },
+  ],
+  adv: [
+    { key:'customDownPct', label:'ARM Down Payment %', min:0.20, max:0.80, step:0.05, fmt:'pct' },
+    { key:'fixedDownPct', label:'Fixed Down Payment %', min:0.20, max:0.80, step:0.05, fmt:'pct' },
+    { key:'ioDownPct', label:'Interest-Only ARM Down Payment %', min:0.20, max:0.80, step:0.05, fmt:'pct' },
+    { key:'inflation', label:'Inflation Rate', min:0.00, max:0.08, step:0.005, fmt:'pct' },
+    { key:'portfolioTaxDrag', label:'Annual Portfolio Tax Drag', min:0.00, max:0.03, step:0.001, fmt:'pct' },
+    { key:'midRealization', label:'MID Realization Factor', min:0.00, max:1.00, step:0.05, fmt:'pct', tip:'Percentage of theoretical mortgage-interest deduction benefit actually realized after itemization, SALT cap, and tax-planning effects.' },
+    { key:'propertyTaxDrag', label:'Annual Property Tax & Maint', min:0.00, max:0.04, step:0.001, fmt:'pct', tip:'Combined property tax + maintenance + insurance as % of home value. Deducted annually from portfolio when Dynamic Drags is on.' },
+  ],
+  arm: [
+    { key:'armIndex', label:'ARM Index (e.g. SOFR)', min:0.01, max:0.08, step:0.001, fmt:'rate', tip:'The reference index rate ARM resets are based on. Current SOFR ~3.6% (May 2026).' },
+    { key:'armMargin', label:'ARM Margin', min:0.01, max:0.04, step:0.0025, fmt:'rate', tip:'Spread above index. Jumbo ARMs typically 2.5–3.0%.' },
+    { key:'armPeriodicCap', label:'Periodic Adjustment Cap', min:0.01, max:0.03, step:0.005, fmt:'pct', tip:'Max rate change per annual adjustment. Standard is 2%.' },
+    { key:'armLifetimeCap', label:'Lifetime Cap Over Start', min:0.03, max:0.08, step:0.01, fmt:'pct', tip:'Max total increase over initial rate. Standard is 5–6%.' },
+  ],
+  mc: [
+    { key:'mcRuns', label:'Simulation Runs', min:500, max:10000, step:500, fmt:'int' },
+    { key:'mcPortfolioVol', label:'Portfolio Volatility', min:0.04, max:0.35, step:0.01, fmt:'pct' },
+    { key:'mcHomeVol', label:'Home Price Volatility', min:0.02, max:0.20, step:0.005, fmt:'pct' },
+    { key:'mcCorrelation', label:'Portfolio / Home Correlation', min:-0.50, max:0.80, step:0.05, fmt:'pct' },
+    { key:'mcRateVol', label:'Rate (SOFR) Annual Volatility', min:0.005, max:0.03, step:0.001, fmt:'pct', tip:'Annual volatility of the ARM index rate. ~1.2% reflects recent SOFR vol. Only affects holds >7yr.' },
+    { key:'mcRatePortCorr', label:'Rate / Portfolio Correlation', min:-0.20, max:0.60, step:0.05, fmt:'pct', tip:'How rate moves track equities. ~0.3 means rates tend to rise when stocks do well.' },
+  ],
+};
+
+const toggleDefs = [
+  { key:'capGainsExclusion', label:'$500K Primary Residence Cap Gains Exclusion (MFJ)' },
+  { key:'showRealDollars', label:'Show Values in Real (Inflation-Adjusted) Dollars' },
+  { key:'dynamicDrags', label:'Dynamic Annual Property Tax & Maint Drag' },
+  { key:'autoComputeMID', label:'Auto-Compute MID Realization (vs. Standard Deduction)' },
+  { key:'modelRefi', label:'Model Refinance During Hold Period' },
+  { key:'showInterestOnly', label:'Include Interest-Only ARM Strategy' },
+];
+
+const refiSliderDefs = [
+  { key:'refiYear', label:'Refinance in Year', min:1, max:15, step:1, fmt:'int' },
+  { key:'refiRate', label:'Refi Rate', min:0.030, max:0.065, step:0.00025, fmt:'rate' },
+  { key:'refiCosts', label:'Refi Closing Costs', fmt:'dollar', input:true },
+];
+
+// Tooltips for metrics
+const TIPS = {
+  'Cash Out at Close': 'Down payment + closing costs. Total cash required on closing day.',
+  'Closing Costs': 'Title, escrow, lender fees, etc. Cash buys are cheaper (no origination).',
+  'Loan Amount': 'Principal balance of the mortgage at origination.',
+  'Monthly P&I': 'Monthly principal + interest payment (excludes taxes/insurance).',
+  'Total Interest Paid': 'Cumulative interest over the hold period.',
+  'Tax Savings (MID)': 'Federal + CO tax savings from mortgage interest deduction, prorated to $750K cap.',
+  'Net Interest Cost': 'Total Interest Paid – MID Tax Savings. True after-tax borrowing cost.',
+  'After-Tax Borrow Cost': 'Net Interest / (Loan × Hold Years). Annualized effective rate after MID.',
+  'Liquidity Retained': 'Cash kept liquid vs. all-cash benchmark. Invested in the market.',
+  'Investment Growth (AT)': 'After-tax growth on retained liquidity lump sum.',
+  'Reinvested Cashflow (AT)': 'After-tax value of monthly payment savings + tax savings invested over time.',
+  'Remaining Balance': 'Mortgage principal still owed at sale.',
+  'Home Sale Proceeds': 'Sale price – selling costs – capital gains tax – remaining balance.',
+  'Property Taxes & Maint': 'Cumulative non-debt housing costs. When Dynamic Drags is on, these reduce portfolio compounding each year.',
+};
+
+function fmtD(n) {
+  const neg = n < 0 ? '-' : '';
+  const a = Math.abs(n);
+  if (a >= 1e6) return neg + '$' + (a/1e6).toFixed(2) + 'M';
+  if (a >= 1e3) return neg + '$' + (a/1e3).toFixed(0) + 'K';
+  return neg + '$' + a.toFixed(0);
+}
+function fmtP(n) { return (n*100).toFixed(1) + '%'; }
+function fmtRate(n) { return (n*100).toFixed(3) + '%'; }
+function fmtVal(v, f) {
+  if (f === 'dollar') return fmtD(v);
+  if (f === 'pct') return fmtP(v);
+  if (f === 'rate') return fmtRate(v);
+  return String(v);
+}
+function toReal(nominal, years, inf) { return nominal / Math.pow(1 + inf, years); }
+
+function mulberry32(seed) {
+  return function() {
+    let t = seed += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function randNorm(rng) {
+  const u1 = Math.max(1e-12, rng());
+  const u2 = Math.max(1e-12, rng());
+  return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+}
+function percentile(arr, pct) {
+  if (!arr.length) return 0;
+  const a = [...arr].sort((x,y)=>x-y);
+  const idx = Math.min(a.length - 1, Math.max(0, Math.floor((a.length - 1) * pct)));
+  return a[idx];
+}
+function seedFromState(p) {
+  const parts = [p.mcSeed, p.purchasePrice, p.holdYears, p.homeApprecRate, p.investReturn, p.fixedRate, p.armRate, p.customDownPct, p.fixedDownPct, p.ioDownPct, p.midRealization, p.mcRuns, p.mcPortfolioVol, p.mcHomeVol, p.mcCorrelation, p.mcRateVol || 0, p.mcRatePortCorr || 0];
+  return Math.abs(Math.floor(parts.reduce((acc, v, i) => acc + Math.round(Number(v) * 1000000) * (i + 17), 0))) || 12345;
+}
+
+function calcAmort(principal, annualRate, termYears, holdYears) {
+  const mr = annualRate / 12, tp = termYears * 12, hp = holdYears * 12;
+  const schedule = [];
+  if (annualRate <= 0 || principal <= 0) {
+    const mp = principal > 0 ? principal / tp : 0;
+    for (let i = 0; i < hp; i++) schedule.push({ mp, ip: 0, pp: mp, bal: Math.max(0, principal - mp * (i+1)) });
+    return { mp, totalInterest: 0, remaining: Math.max(0, principal - mp * hp), principalPaid: Math.min(principal, mp * hp), schedule };
+  }
+  const mp = (principal * mr * Math.pow(1+mr, tp)) / (Math.pow(1+mr, tp) - 1);
+  let bal = principal, ti = 0;
+  for (let i = 0; i < hp; i++) {
+    if (bal > 0) {
+      const ip = bal * mr;
+      const pp = mp - ip;
+      ti += ip;
+      bal -= pp;
+      schedule.push({ mp, ip, pp, bal: Math.max(0, bal) });
+    } else {
+      schedule.push({ mp: 0, ip: 0, pp: 0, bal: 0 });
+    }
+  }
+  return { mp, totalInterest: ti, remaining: Math.max(0, bal), principalPaid: principal - Math.max(0, bal), schedule };
+}
+
+// Full ARM with annual resets, periodic & lifetime caps
+// index can be a number (static) or array (per-year for MC)
+function calcARMFull(principal, startRate, index, margin, periodicCap, lifetimeCap, termYears, holdYears) {
+  const hp = holdYears * 12;
+  const tp = termYears * 12;
+  const lifetimeMax = startRate + lifetimeCap;
+  const lifetimeFloor = Math.max(margin, startRate - lifetimeCap);
+  let bal = principal, ti = 0;
+  const schedule = [];
+
+  let currentRate = startRate;
+  let mr = currentRate / 12;
+  let remainingPayments = tp;
+  let mp = bal > 0 && mr > 0 ? (bal * mr * Math.pow(1+mr, remainingPayments)) / (Math.pow(1+mr, remainingPayments) - 1) : (bal > 0 ? bal / remainingPayments : 0);
+
+  for (let m = 0; m < hp; m++) {
+    // Annual reset at months 84, 96, 108, etc.
+    if (m >= 84 && m % 12 === 0 && m > 0) {
+      const yr = Math.floor(m / 12);
+      const idxRate = Array.isArray(index) ? (index[yr] ?? index[index.length-1]) : index;
+      const targetRate = idxRate + margin;
+      const prevRate = currentRate;
+      let newRate = Math.min(targetRate, prevRate + periodicCap);
+      newRate = Math.max(newRate, prevRate - periodicCap);
+      newRate = Math.min(newRate, lifetimeMax);
+      newRate = Math.max(newRate, lifetimeFloor);
+      currentRate = newRate;
+      mr = currentRate / 12;
+      remainingPayments = tp - m;
+      if (bal > 0 && mr > 0 && remainingPayments > 0) {
+        mp = (bal * mr * Math.pow(1+mr, remainingPayments)) / (Math.pow(1+mr, remainingPayments) - 1);
+      }
+    }
+    if (bal > 0) {
+      const ip = bal * mr;
+      const pp = Math.min(mp - ip, bal);
+      ti += ip;
+      bal -= pp;
+      schedule.push({ mp, ip, pp, bal: Math.max(0, bal) });
+    } else {
+      schedule.push({ mp: 0, ip: 0, pp: 0, bal: 0 });
+    }
+  }
+  return {
+    mp1: schedule.length > 0 ? schedule[0].mp : 0,
+    mp2: schedule.length > 84 ? schedule[84].mp : schedule[schedule.length-1].mp,
+    totalInterest: ti,
+    remaining: Math.max(0, bal),
+    resetRateUsed: currentRate,
+    schedule
+  };
+}
+
+// Interest-Only ARM
+function calcInterestOnlyARM(principal, startRate, ioYears, termYears, holdYears) {
+  const hp = holdYears * 12;
+  const ioMonths = ioYears * 12;
+  const schedule = [];
+  let bal = principal, ti = 0;
+  const mr = startRate / 12;
+  // IO phase
+  for (let m = 0; m < Math.min(ioMonths, hp); m++) {
+    const ip = bal * mr;
+    ti += ip;
+    schedule.push({ mp: ip, ip, pp: 0, bal });
+  }
+  // Amortizing phase
+  if (hp > ioMonths) {
+    const remainingTerm = (termYears * 12) - ioMonths;
+    const amort = calcAmort(bal, startRate, remainingTerm / 12, (hp - ioMonths) / 12);
+    amort.schedule.forEach(s => { ti += 0; /* already counted in calcAmort */ schedule.push(s); });
+    ti = schedule.reduce((a, s) => a + s.ip, 0);
+    bal = schedule[schedule.length - 1].bal;
+  }
+  return {
+    mp1: schedule[0]?.mp || 0,
+    mp2: hp > ioMonths && schedule[ioMonths] ? schedule[ioMonths].mp : schedule[0]?.mp || 0,
+    totalInterest: ti,
+    remaining: Math.max(0, bal),
+    schedule,
+    resetRateUsed: startRate,
+  };
+}
+
+function calcAmortWithRefi(principal, rate1, refiYear, rate2, refiCosts, term1, holdYears) {
+  const phase1 = calcAmort(principal, rate1, term1, refiYear);
+  const newPrincipal = phase1.remaining + refiCosts;
+  const remainingTerm = term1 - refiYear;
+  const phase2 = calcAmort(newPrincipal, rate2, remainingTerm, holdYears - refiYear);
+  return {
+    mp1: phase1.mp, mp2: phase2.mp,
+    totalInterest: phase1.totalInterest + phase2.totalInterest,
+    remaining: phase2.remaining, refiCosts,
+    schedule: phase1.schedule.concat(phase2.schedule)
+  };
+}
+
+function afterTaxLumpFV(principal, annualReturns, years, baseTaxDrag, exitTaxRate) {
+  if (principal <= 0) return { fv: 0, basis: 0, gain: 0 };
+  let current = principal;
+  for (let y = 0; y < years; y++) {
+    const r = Array.isArray(annualReturns) ? annualReturns[y] : annualReturns;
+    // #7: Variable drag — higher in up years (distributions), lower in down years (TLH)
+    const effectiveDrag = r > 0 ? baseTaxDrag * Math.min(1.5, 1 + r) : baseTaxDrag * 0.2;
+    current *= (1 + (r - effectiveDrag));
+  }
+  const gain = Math.max(0, current - principal);
+  return { fv: principal + gain * (1 - exitTaxRate), basis: principal, gain };
+}
+
+function afterTaxSeriesFV(monthlyContribs, annualReturns, baseTaxDrag, exitTaxRate) {
+  let fv = 0, totalContribs = 0, totalWithdrawals = 0;
+  for (let m = 0; m < monthlyContribs.length; m++) {
+    const y = Math.floor(m / 12);
+    const r = Array.isArray(annualReturns) ? annualReturns[y] : annualReturns;
+    // #7: Variable drag
+    const effectiveDrag = r > 0 ? baseTaxDrag * Math.min(1.5, 1 + r) : baseTaxDrag * 0.2;
+    const mr = (r - effectiveDrag) / 12;
+    fv = fv * (1 + mr) + monthlyContribs[m];
+    if (monthlyContribs[m] >= 0) totalContribs += monthlyContribs[m];
+    else totalWithdrawals += Math.abs(monthlyContribs[m]);
+    if (fv < 0) fv = 0;
+  }
+  const basis = totalContribs - totalWithdrawals;
+  const gain = Math.max(0, fv - Math.max(0, basis));
+  return { fv: Math.max(0, basis) + gain * (1 - exitTaxRate), basis, gain };
+}
+
+function buildUI() {
+  const groups = ['core', 'costs', 'adv', 'arm', 'mc'];
+  groups.forEach(g => {
+    const el = document.getElementById('sliders-' + g);
+    if (!el) return;
+    el.innerHTML = '';
+    sliderGroups[g].forEach(d => {
+      if (d.input) {
+        const div = document.createElement('div');
+        div.className = 'dollar-input-group';
+        div.innerHTML = `
+          <div class="dollar-input-row">
+            <span class="slider-label">${d.label}</span>
+            <input type="text" inputmode="numeric" class="dollar-input" id="di-${d.key}" value="${state[d.key].toLocaleString()}">
+          </div>
+        `;
+        el.appendChild(div);
+        const inp = document.getElementById('di-' + d.key);
+        inp.addEventListener('input', () => {
+          const raw = inp.value.replace(/,/g, '');
+          const v = parseFloat(raw);
+          if (isNaN(v) || v < 0) {
+            inp.classList.add('invalid');
+            return;
+          }
+          inp.classList.remove('invalid');
+          state[d.key] = v;
+          _cache.clear();
+          render();
+        });
+        inp.addEventListener('blur', () => {
+          if (state[d.key] < 0) state[d.key] = 0;
+          inp.value = state[d.key].toLocaleString();
+          inp.classList.remove('invalid');
+        });
+      } else {
+        const tipHtml = d.tip ? `<span class="has-tip" style="margin-left:4px;font-size:9px;color:var(--text-dim)">ⓘ<span class="tip">${d.tip}</span></span>` : '';
+        const div = document.createElement('div');
+        div.className = 'slider-group';
+        div.innerHTML = `
+          <div class="slider-header">
+            <span class="slider-label">${d.label}${tipHtml}</span>
+            <span class="slider-value mono" id="sv-${d.key}">${fmtVal(state[d.key], d.fmt)}</span>
+          </div>
+          <input type="range" id="sl-${d.key}" min="${d.min}" max="${d.max}" step="${d.step}" value="${state[d.key]}">
+        `;
+        el.appendChild(div);
+        const inp = document.getElementById('sl-' + d.key);
+        inp.addEventListener('input', () => {
+          state[d.key] = parseFloat(inp.value);
+          document.getElementById('sv-' + d.key).textContent = fmtVal(state[d.key], d.fmt);
+          _cache.clear();
+          render();
+        });
+      }
+    });
+  });
+
+  const tel = document.getElementById('toggles');
+  tel.innerHTML = '';
+  toggleDefs.forEach(t => {
+    const row = document.createElement('div');
+    row.className = 'toggle-row';
+    row.innerHTML = `<span class="toggle-label">${t.label}</span><button class="toggle-btn${state[t.key]?' on':''}" id="tgl-${t.key}"></button>`;
+    tel.appendChild(row);
+    document.getElementById('tgl-' + t.key).addEventListener('click', function() {
+      state[t.key] = !state[t.key];
+      this.classList.toggle('on');
+      _cache.clear();
+      renderRefiSection();
+      render();
+    });
+  });
+  renderRefiSection();
+
+  // Export buttons
+  document.getElementById('btn-share').addEventListener('click', shareURL);
+  document.getElementById('btn-csv').addEventListener('click', exportCSV);
+}
+
+function renderRefiSection() {
+  const el = document.getElementById('refi-section');
+  if (!state.modelRefi) { el.innerHTML = ''; return; }
+  el.innerHTML = '<div class="section-divider" style="margin-top:4px">Refinance Scenario</div>';
+  refiSliderDefs.forEach(d => {
+    if (d.input) {
+      const div = document.createElement('div');
+      div.className = 'dollar-input-group';
+      div.innerHTML = `
+        <div class="dollar-input-row">
+          <span class="slider-label">${d.label}</span>
+          <input type="text" inputmode="numeric" class="dollar-input" id="di-${d.key}" value="${state[d.key].toLocaleString()}">
+        </div>
+      `;
+      el.appendChild(div);
+      const inp = document.getElementById('di-' + d.key);
+      inp.addEventListener('input', () => {
+        const v = parseFloat(inp.value.replace(/,/g, ''));
+        if (isNaN(v) || v < 0) { inp.classList.add('invalid'); return; }
+        inp.classList.remove('invalid');
+        state[d.key] = v; _cache.clear(); render();
+      });
+      inp.addEventListener('blur', () => { inp.value = state[d.key].toLocaleString(); inp.classList.remove('invalid'); });
+    } else {
+      const div = document.createElement('div');
+      div.className = 'slider-group';
+      div.innerHTML = `
+        <div class="slider-header">
+          <span class="slider-label">${d.label}</span>
+          <span class="slider-value mono" id="svr-${d.key}">${fmtVal(state[d.key], d.fmt)}</span>
+        </div>
+        <input type="range" id="slr-${d.key}" min="${d.min}" max="${d.max}" step="${d.step}" value="${state[d.key]}">
+      `;
+      el.appendChild(div);
+      const inp = document.getElementById('slr-' + d.key);
+      inp.addEventListener('input', () => {
+        state[d.key] = parseFloat(inp.value);
+        document.getElementById('svr-' + d.key).textContent = fmtVal(state[d.key], d.fmt);
+        _cache.clear(); render();
+      });
+    }
+  });
+}
+
+function runScenarios(p) {
+  const isMC = Array.isArray(p.investReturn);
+  const investRetArray = isMC ? p.investReturn : Array(p.holdYears).fill(p.investReturn);
+  const homeApprecArray = isMC ? p.homeApprecRate : Array(p.holdYears).fill(p.homeApprecRate);
+
+  let fhv = p.purchasePrice;
+  const annualHomeValues = [p.purchasePrice]; // year 0 = purchase price
+  let totalPropDrag = 0;
+  const annualPropDrags = [];
+  for(let y = 0; y < p.holdYears; y++) {
+    fhv *= (1 + homeApprecArray[y]);
+    annualHomeValues.push(fhv);
+    // #8: Assessment lag — CO reassesses every 2 years, ~2yr lag
+    const assessedValue = y < 2 ? p.purchasePrice : annualHomeValues[y - 1];
+    const drag = assessedValue * (p.propertyTaxDrag || 0);
+    totalPropDrag += drag;
+    annualPropDrags.push(drag);
+  }
+
+  // #4: Compute MID realization factor
+  let midRealization = p.midRealization ?? 0.85;
+  if (p.autoComputeMID) {
+    // Estimate year-1 MID to check against standard deduction
+    const maxLoan = Math.max(
+      p.purchasePrice * (1 - p.customDownPct),
+      p.purchasePrice * (1 - p.fixedDownPct),
+      p.showInterestOnly ? p.purchasePrice * (1 - p.ioDownPct) : 0
+    );
+    const avgRate = (p.armRate + p.fixedRate) / 2;
+    const estAnnualMID = maxLoan * avgRate * Math.min(1, MID_CAP / maxLoan);
+    const totalItemized = estAnnualMID + (p.otherItemized || 16000);
+    const stdDed = p.stdDeduction || 30700;
+    if (totalItemized <= stdDed) {
+      midRealization = 0; // MID adds no value — standard deduction is higher
+    } else {
+      // Marginal benefit: only the amount above std deduction attributable to MID
+      const midContribution = Math.min(estAnnualMID, totalItemized - stdDed);
+      midRealization = estAnnualMID > 0 ? midContribution / estAnnualMID : 0;
+    }
+  }
+
+  const homeGain = fhv - p.purchasePrice;
+  const exclusion = p.capGainsExclusion ? CAP_GAINS_EXCL : 0;
+  const taxableHomeGain = Math.max(0, homeGain - exclusion);
+  const homeTax = taxableHomeGain * INVEST_TAX;
+  const sellingCosts = fhv * p.sellingCostPct;
+  const netHomeSale = fhv - sellingCosts - homeTax;
+
+  const allInCashBenchmark = p.purchasePrice + p.closingCostCash;
+  const scenarios = [];
+  const numStrategies = p.showInterestOnly ? 4 : 3;
+
+  function baseScenario(name, downPct, rate, type) {
+    const isCash = downPct >= 1;
+    const dpBase = isCash ? p.purchasePrice : p.purchasePrice * downPct;
+    const loan = isCash ? 0 : p.purchasePrice * (1 - downPct);
+    const closingCosts = isCash ? p.closingCostCash : p.closingCostFin;
+    const cashAtClose = dpBase + closingCosts;
+    const liquidity = Math.max(0, allInCashBenchmark - cashAtClose);
+
+    let totalInterest = 0, remaining = 0, mp = 0, mp2 = 0, refiCostsActual = 0, resetRateUsed = null;
+    let schedule = [];
+
+    if (!isCash && type === 'arm') {
+      if (p.modelRefi && p.refiYear < p.holdYears) {
+        const r = calcAmortWithRefi(loan, p.armRate, p.refiYear, p.refiRate, p.refiCosts, 30, p.holdYears);
+        totalInterest = r.totalInterest; remaining = r.remaining; mp = r.mp1; mp2 = r.mp2; refiCostsActual = r.refiCosts; schedule = r.schedule;
+      } else {
+        // Full ARM with annual resets — use stochastic index path if available (#1)
+        const idxInput = p.armIndexPath || p.armIndex;
+        const r = calcARMFull(loan, p.armRate, idxInput, p.armMargin, p.armPeriodicCap, p.armLifetimeCap, 30, p.holdYears);
+        totalInterest = r.totalInterest; remaining = r.remaining; mp = r.mp1; mp2 = r.mp2; resetRateUsed = r.resetRateUsed; schedule = r.schedule;
+      }
+    } else if (!isCash && type === 'fixed') {
+      if (p.modelRefi && p.refiYear < p.holdYears) {
+        const r = calcAmortWithRefi(loan, p.fixedRate, p.refiYear, p.refiRate, p.refiCosts, 30, p.holdYears);
+        totalInterest = r.totalInterest; remaining = r.remaining; mp = r.mp1; mp2 = r.mp2; refiCostsActual = r.refiCosts; schedule = r.schedule;
+      } else {
+        const r = calcAmort(loan, p.fixedRate, 30, p.holdYears);
+        totalInterest = r.totalInterest; remaining = r.remaining; mp = r.mp; mp2 = r.mp; schedule = r.schedule;
+      }
+    } else if (!isCash && type === 'io') {
+      const r = calcInterestOnlyARM(loan, p.armRate, p.ioYears || 10, 30, p.holdYears);
+      totalInterest = r.totalInterest; remaining = r.remaining; mp = r.mp1; mp2 = r.mp2; schedule = r.schedule;
+    } else {
+      for(let i=0; i<p.holdYears*12; i++) schedule.push({ mp: 0, ip: 0, pp: 0, bal: 0 });
+    }
+
+    let taxSavings = 0;
+    const taxSavingsByMonth = schedule.map(m => {
+      const startBal = m.bal + m.pp;
+      const dedPct = startBal > 0 ? Math.min(1, MID_CAP / startBal) : 0;
+      const save = m.ip * dedPct * TAX_RATE * midRealization;
+      taxSavings += save;
+      return save;
+    });
+
+    const effectiveCost = loan > 0 ? (totalInterest - taxSavings) / (loan * p.holdYears) : 0;
+
+    return {
+      name, dp: dpBase, closingCosts, loan, mp, mp2, totalInterest, taxSavings, taxSavingsByMonth,
+      netInterest: totalInterest - taxSavings, effectiveCost, liquidity, investGrowthAT: 0, oppCost: 0,
+      remaining, refiCostsActual, resetRateUsed, netHomeSaleProceeds: netHomeSale - remaining,
+      reinvestedCashflow: 0, reinvestedCashflowAT: 0, totalCashDeployed: cashAtClose, schedule, netWealth: 0,
+    };
+  }
+
+  scenarios.push(baseScenario('All Cash', 1, 0, 'cash'));
+  scenarios.push(baseScenario(`${(p.customDownPct*100).toFixed(0)}% Down · ARM`, p.customDownPct, p.armRate, 'arm'));
+  scenarios.push(baseScenario(`${(p.fixedDownPct*100).toFixed(0)}% Down · Fixed`, p.fixedDownPct, p.fixedRate, 'fixed'));
+  if (p.showInterestOnly) {
+    scenarios.push(baseScenario(`${(p.ioDownPct*100).toFixed(0)}% Down · IO ARM`, p.ioDownPct, p.armRate, 'io'));
+  }
+
+  const months = p.holdYears * 12;
+  const maxMonthlyByMonth = Array.from({length: months}, (_, i) => Math.max(...scenarios.map(s => s.schedule[i]?.mp || 0)));
+  const useDynamic = p.dynamicDrags;
+  // Monthly property tax/maint for each year (same across all strategies)
+  const monthlyPropDrags = annualPropDrags.map(d => d / 12);
+
+  scenarios.forEach(s => {
+    const lump = afterTaxLumpFV(s.liquidity, investRetArray, p.holdYears, p.portfolioTaxDrag, INVEST_TAX);
+    const monthlyContribs = Array.from({length: months}, (_, i) => {
+      const base = Math.max(0, maxMonthlyByMonth[i] - (s.schedule[i]?.mp || 0) + s.taxSavingsByMonth[i]);
+      if (useDynamic) {
+        // Subtract monthly property tax/maint from investable cashflow
+        return base - (monthlyPropDrags[Math.floor(i / 12)] || 0);
+      }
+      return base;
+    });
+    const series = afterTaxSeriesFV(monthlyContribs, investRetArray, p.portfolioTaxDrag, INVEST_TAX);
+
+    const portfolioFV = lump.fv + series.fv;
+    s.investGrowthAT = Math.max(0, lump.fv - s.liquidity);
+    s.reinvestedCashflowAT = series.fv;
+    s.reinvestedCashflow = monthlyContribs.reduce((a,b)=>a+b,0);
+
+    if (useDynamic) {
+      // Drags already deducted from monthly cashflow (reduces compounding basis)
+      s.netWealth = (netHomeSale - s.remaining) + portfolioFV;
+      s.propDragDeducted = totalPropDrag;
+    } else {
+      // Legacy: lump sum deduction at exit
+      s.netWealth = (netHomeSale - s.remaining) + portfolioFV - totalPropDrag;
+      s.propDragDeducted = totalPropDrag;
+    }
+  });
+
+  if (p.showRealDollars) {
+    const rf = Math.pow(1 + p.inflation, p.holdYears);
+    scenarios.forEach(s => { s.netWealth /= rf; });
+  }
+
+  return {
+    scenarios, fhv, homeGain, homeTax, sellingCosts, netHomeSale, totalPropDrag,
+    allInCashBenchmark, realFactor: p.showRealDollars ? Math.pow(1 + p.inflation, p.holdYears) : 1
+  };
+}
+
+function getGridCols(n) { return n === 4 ? '1.3fr 1fr 1fr 1fr 1fr' : '1.3fr 1fr 1fr 1fr'; }
+
+function renderMainTable(data) {
+  const s = data.scenarios;
+  const n = s.length;
+  const bestIdx = s.map(x=>x.netWealth).indexOf(Math.max(...s.map(x=>x.netWealth)));
+
+  function metricRow(label, vals, opts={}) {
+    const format = opts.formatFn || fmtD;
+    let max = -Infinity, min = Infinity;
+    if (opts.highlight) {
+      vals.forEach(v => { if(v > max) max=v; if(v < min) min=v; });
+    }
+    const rf = data.realFactor;
+    const tip = TIPS[label];
+    const labelHtml = tip ? `<span class="has-tip">${label}<span class="tip">${tip}</span></span>` : label;
+    return `<div class="grid-head metric-row" style="grid-template-columns:${getGridCols(n)}"><div class="label">${labelHtml}</div>` + vals.map(v => {
+      let isBest = false;
+      if (opts.highlight) {
+        if (opts.reverse) { isBest = v === min && max !== min; }
+        else { isBest = v === max && max !== min; }
+      }
+      return `<div class="val${isBest?' best':''}">${format(v)}</div>`;
+    }).join('') + '</div>';
+  }
+
+  // #21: Mobile abbreviated names
+  function shortName(n) {
+    if (n === 'All Cash') return 'Cash';
+    return n.replace(/% Down · /g, '% ').replace('IO ARM', 'IO');
+  }
+
+  const realLabel = state.showRealDollars ? ' (Real)' : '';
+  const headerCols = s.map((x,i) => `<div style="text-align:right;color:${i===bestIdx?'var(--green)':'var(--accent)'}"><span class="strat-full">${x.name}</span><span class="strat-short">${shortName(x.name)}</span></div>`).join('');
+
+  let html = `<div class="grid-head grid-head-header" style="grid-template-columns:${getGridCols(n)}"><div>Metric</div>${headerCols}</div>`;
+
+  html += metricRow('Cash Out at Close', s.map(x=>x.dp));
+  html += metricRow('Closing Costs', s.map(x=>x.closingCosts));
+  html += metricRow('Loan Amount', s.map(x=>x.loan));
+  html += metricRow('Monthly P&I', s.map(x=>x.mp), {reverse:true, highlight:true});
+
+  if (state.modelRefi && state.refiYear < state.holdYears) {
+    html += metricRow(`Payment After Refi (Yr ${state.refiYear})`, s.map(x=>x.mp2 || 0), {reverse:true, highlight:true});
+    html += metricRow('Refi Closing Costs', s.map(x=>x.refiCostsActual || 0), {reverse:true, highlight:true});
+  }
+
+  html += metricRow('Total Interest Paid', s.map(x=>x.totalInterest), {reverse:true, highlight:true});
+  html += metricRow('Tax Savings (MID)', s.map(x=>x.taxSavings), {highlight:true});
+  html += metricRow('Net Interest Cost', s.map(x=>x.netInterest), {reverse:true, highlight:true});
+  html += metricRow('After-Tax Borrow Cost', s.map(x=>x.effectiveCost), {formatFn:fmtRate, reverse:true, highlight:true});
+  html += metricRow('Liquidity Retained', s.map(x=>x.liquidity), {highlight:true});
+  html += metricRow('Investment Growth (AT)' + realLabel, s.map(x=>x.investGrowthAT), {highlight:true});
+  html += metricRow('Reinvested Cashflow (AT)' + realLabel, s.map(x=>x.reinvestedCashflowAT), {highlight:true});
+  html += metricRow('Remaining Balance', s.map(x=>x.remaining), {reverse:true, highlight:true});
+  html += metricRow('Home Sale Proceeds' + realLabel, s.map(x => x.netHomeSaleProceeds), {highlight:true});
+  html += metricRow('Selling Costs', s.map(()=>data.sellingCosts), {reverse:true});
+  html += metricRow('Home Sale Tax', s.map(()=>data.homeTax), {reverse:true});
+  html += metricRow('Property Taxes & Maint', s.map(x=>x.propDragDeducted || data.totalPropDrag), {reverse:true});
+
+  html += `<div class="grid-head wealth-row" style="grid-template-columns:${getGridCols(n)}"><div class="label">Net Wealth at Exit${realLabel}</div>`;
+  html += s.map((x,i) => `<div class="val${i===bestIdx?' best':''}" style="color:${i===bestIdx?'var(--green)':'var(--text)'}">${fmtD(x.netWealth)}</div>`).join('');
+  html += `</div>`;
+
+  const bestName = s[bestIdx].name;
+  const bestMargin = s[bestIdx].netWealth - Math.max(...s.filter((_,i)=>i!==bestIdx).map(x=>x.netWealth));
+  html += `<div class="winner-banner"><strong>${bestName}</strong> produces the highest net wealth at exit (<strong>+${fmtD(bestMargin)}</strong> over runner-up).</div>`;
+
+  document.getElementById('main-table').innerHTML = html;
+}
+
+function renderCashflow(data) {
+  const s = data.scenarios;
+  const n = s.length;
+  const yrs = state.holdYears;
+  const inf = state.inflation;
+
+  let html = `<div class="section-title" style="margin-top:12px">Monthly Cash Flow Neutralization</div>
+  <div class="section-sub">Assumes a fixed housing budget across all strategies equal to the highest monthly payment. Lower-payment strategies invest the difference, and all tax savings are reinvested.</div>`;
+
+  const cfLabels = [
+    {k:'mp', n:'Principal & Interest'},
+    {k:'inv', n:'Invested Difference'},
+    {k:'tax', n:'Reinvested Tax Savings (Avg)'}
+  ];
+
+  cfLabels.forEach(l => {
+    html += `<div class="cashflow-row"><div class="cashflow-label">${l.n}</div><div class="cashflow-vals">`;
+    s.forEach(x => {
+      let v = 0;
+      if (l.k === 'mp') v = x.mp;
+      if (l.k === 'inv') v = Math.max(...s.map(z=>z.mp)) - x.mp;
+      if (l.k === 'tax') v = x.taxSavings / (yrs * 12);
+      html += `<div class="cashflow-val">${fmtD(v)}/mo</div>`;
+    });
+    html += `</div></div>`;
+  });
+
+  const totals = s.map(x => {
+    if (state.modelRefi && state.refiYear < yrs && x.mp2 && x.mp2 !== x.mp) {
+      return x.mp * 12 * state.refiYear + x.mp2 * 12 * (yrs - state.refiYear);
+    }
+    return x.mp * 12 * yrs;
+  });
+
+  html += `<div style="display:flex;justify-content:space-between;padding:10px 0 0;border-top:2px solid var(--accent);margin-top:4px">
+    <span style="color:var(--accent);font-size:11px;font-weight:700;text-transform:uppercase">Total Payments</span>
+    <div style="display:flex;gap:10px">
+      ${totals.map(t => `<span class="mono" style="font-size:11px;font-weight:700;min-width:68px;text-align:right;color:var(--text)">${fmtD(t)}</span>`).join('')}
+    </div>
+  </div>`;
+
+  if (!state.showRealDollars && inf > 0) {
+    const y7real = (s[1].mp * 12) / Math.pow(1 + inf, Math.min(yrs, 7));
+    html += `<div style="margin-top:10px;padding:8px 10px;background:var(--bg);border-radius:6px;border:1px solid var(--border);font-size:11px;color:var(--text-muted)">
+      At ${fmtP(inf)} inflation, the ARM's ${fmtD(s[1].mp * 12)}/yr payment is worth ${fmtD(y7real)}/yr in today's dollars by year ${Math.min(yrs, 7)}. Toggle "Real Dollars" above to see all values inflation-adjusted.
+    </div>`;
+  }
+
+  document.getElementById('cashflow').innerHTML = html;
+}
+
+function renderStress() {
+  const tests = [
+    { name:'Bear Case', sub:'Mkt -3%, Home -3%', ir:-0.03, ha:-0.03 },
+    { name:'Stagnation', sub:'Mkt +4%, Home +1%', ir:0.04, ha:0.01 },
+    { name:'Base Case', sub:`Mkt +${(state.investReturn*100).toFixed(1)}%, Home +${(state.homeApprecRate*100).toFixed(1)}%`, ir:state.investReturn, ha:state.homeApprecRate },
+    { name:'Bull Case', sub:'Mkt +15%, Home +6%', ir:0.15, ha:0.06 },
+    { name:'Custom', sub:`Mkt +${(state.customStressIR*100).toFixed(1)}%, Home ${state.customStressHA >= 0 ? '+' : ''}${(state.customStressHA*100).toFixed(1)}%`, ir:state.customStressIR, ha:state.customStressHA, custom:true },
+  ];
+  let html = `<div class="section-title">Stress Testing</div><div class="section-sub">Net wealth under different market conditions. Adjust the Custom scenario below.</div>`;
+
+  const allResults = tests.map(t => runScenariosCached({...state, investReturn: t.ir, homeApprecRate: t.ha}).scenarios);
+  const allWealth = allResults.flat().map(s => s.netWealth);
+  const max = Math.max(...allWealth);
+  const min = Math.min(...allWealth);
+
+  tests.forEach((t, ti) => {
+    const res = allResults[ti];
+    const borderStyle = t.custom ? 'border-left:2px solid var(--accent);padding-left:8px' : '';
+    html += `<div class="stress-scenario" style="${borderStyle}">
+      <div class="stress-header">
+        <span class="stress-name">${t.name}</span>
+        <span class="stress-sub">${t.sub}</span>
+      </div>`;
+
+    res.forEach((s, i) => {
+      const isWinner = s.netWealth === Math.max(...res.map(x=>x.netWealth));
+      const w = Math.max(2, ((s.netWealth - Math.min(0, min)) / (max - Math.min(0, min))) * 100);
+      const color = isWinner ? 'var(--green)' : 'var(--blue)';
+      const bg = isWinner ? 'var(--winner-border)' : 'var(--border)';
+      html += `
+        <div class="bar-row">
+          <div class="bar-label">${s.name.split('·')[0].trim()}</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${w}%;background:${bg}"></div>
+          </div>
+          <div class="bar-val" style="color:${color}">${fmtD(s.netWealth)}</div>
+        </div>`;
+    });
+    html += `</div>`;
+  });
+
+  // #20: Custom scenario sliders
+  html += `<div style="margin-top:8px;padding:10px;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+    <div style="font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;font-weight:600">Custom Scenario</div>
+    <div class="slider-group" style="margin-bottom:8px">
+      <div class="slider-header"><span class="slider-label">Market Return</span><span class="slider-value mono" id="sv-csIR">${fmtP(state.customStressIR)}</span></div>
+      <input type="range" id="sl-csIR" min="-0.10" max="0.20" step="0.005" value="${state.customStressIR}">
+    </div>
+    <div class="slider-group" style="margin-bottom:0">
+      <div class="slider-header"><span class="slider-label">Home Appreciation</span><span class="slider-value mono" id="sv-csHA">${fmtP(state.customStressHA)}</span></div>
+      <input type="range" id="sl-csHA" min="-0.10" max="0.10" step="0.005" value="${state.customStressHA}">
+    </div>
+  </div>`;
+
+  document.getElementById('stress-test').innerHTML = html;
+
+  // Wire custom stress sliders
+  const irSlider = document.getElementById('sl-csIR');
+  const haSlider = document.getElementById('sl-csHA');
+  if (irSlider) {
+    irSlider.addEventListener('input', () => {
+      state.customStressIR = parseFloat(irSlider.value);
+      document.getElementById('sv-csIR').textContent = fmtP(state.customStressIR);
+      _cache.clear(); renderStress();
+    });
+  }
+  if (haSlider) {
+    haSlider.addEventListener('input', () => {
+      state.customStressHA = parseFloat(haSlider.value);
+      document.getElementById('sv-csHA').textContent = fmtP(state.customStressHA);
+      _cache.clear(); renderStress();
+    });
+  }
+}
+
+// #12: Year-by-year wealth trajectory
+function renderTrajectory() {
+  const years = state.holdYears;
+  const stratNames = [];
+  const trajectories = [];
+  // Run scenario at each hold period from 1 to holdYears
+  for (let y = 0; y <= years; y++) {
+    if (y === 0) {
+      const res = runScenariosCached(state);
+      res.scenarios.forEach((s, i) => {
+        stratNames.push(s.name);
+        trajectories.push([state.purchasePrice + state.closingCostCash]); // all start at same total capital
+      });
+    } else {
+      const res = runScenariosCached({...state, holdYears: y});
+      res.scenarios.forEach((s, i) => {
+        trajectories[i].push(s.netWealth);
+      });
+    }
+  }
+
+  let html = `<div class="section-title">Wealth Trajectory</div>
+  <div class="section-sub">Net wealth at each year if you sold. Shows when leverage crosses over cash and where maximum regret occurs.</div>
+  <canvas id="traj-chart" width="760" height="220" style="width:100%;height:220px;border-radius:6px;background:var(--bg);border:1px solid var(--border)"></canvas>`;
+  document.getElementById('trajectory').innerHTML = html;
+
+  requestAnimationFrame(() => drawTrajectory(stratNames, trajectories, years));
+}
+
+function drawTrajectory(names, trajs, years) {
+  const canvas = document.getElementById('traj-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = canvas.clientWidth * dpr;
+  canvas.height = canvas.clientHeight * dpr;
+  ctx.scale(dpr, dpr);
+  const W = canvas.clientWidth, H = canvas.clientHeight;
+  const pad = { l: 55, r: 12, t: 14, b: 28 };
+  const chartW = W - pad.l - pad.r;
+  const chartH = H - pad.t - pad.b;
+
+  const allVals = trajs.flat();
+  const minV = Math.min(...allVals);
+  const maxV = Math.max(...allVals);
+  const range = maxV - minV || 1;
+
+  const lineColors = ['#4A8FCC', '#3AA675', '#B8CC52', '#D4944E'];
+
+  // Grid lines
+  ctx.strokeStyle = '#1A1F28'; ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.t + (i / 4) * chartH;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+  }
+  // Axes
+  ctx.strokeStyle = '#252B36'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b); ctx.stroke();
+
+  // Lines
+  trajs.forEach((pts, si) => {
+    ctx.strokeStyle = lineColors[si] || lineColors[0];
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    pts.forEach((v, xi) => {
+      const x = pad.l + (xi / years) * chartW;
+      const y = pad.t + chartH - ((v - minV) / range) * chartH;
+      if (xi === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    // End dot
+    const lastX = pad.l + chartW;
+    const lastY = pad.t + chartH - ((pts[pts.length - 1] - minV) / range) * chartH;
+    ctx.fillStyle = lineColors[si]; ctx.beginPath(); ctx.arc(lastX, lastY, 3, 0, Math.PI * 2); ctx.fill();
+  });
+
+  // X labels
+  ctx.fillStyle = '#8B8A87'; ctx.font = '9px "JetBrains Mono", monospace'; ctx.textAlign = 'center';
+  for (let yr = 0; yr <= years; yr++) {
+    if (yr % Math.max(1, Math.floor(years / 6)) === 0 || yr === years) {
+      ctx.fillText(`Yr ${yr}`, pad.l + (yr / years) * chartW, H - 8);
+    }
+  }
+  // Y labels
+  ctx.textAlign = 'right';
+  for (let i = 0; i <= 4; i++) {
+    const v = maxV - (i / 4) * range;
+    ctx.fillText(fmtD(v), pad.l - 4, pad.t + (i / 4) * chartH + 4);
+  }
+  // Legend
+  names.forEach((name, i) => {
+    const lx = pad.l + 8, ly = pad.t + 4 + i * 13;
+    ctx.fillStyle = lineColors[i]; ctx.fillRect(lx, ly, 10, 2.5);
+    ctx.fillStyle = '#8B8A87'; ctx.font = '8px "DM Sans", sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText(name, lx + 14, ly + 4);
+  });
+}
+
+function renderBreakeven() {
+  function wealthDiffAtReturn(ret, years, leftIdx, rightIdx) {
+    const res = runScenariosCached({...state, holdYears: years, investReturn: ret}).scenarios;
+    if (leftIdx >= res.length || rightIdx >= res.length) return null;
+    return res[leftIdx].netWealth - res[rightIdx].netWealth;
+  }
+
+  function solveReturnBreakeven(years, leftIdx, rightIdx) {
+    let lo = -0.05, hi = 0.20;
+    let flo = wealthDiffAtReturn(lo, years, leftIdx, rightIdx);
+    let fhi = wealthDiffAtReturn(hi, years, leftIdx, rightIdx);
+    if (flo === null || fhi === null) return null;
+    if (Math.abs(flo) < 1) return lo;
+    if (Math.abs(fhi) < 1) return hi;
+    if (flo * fhi > 0) return null;
+    for (let i = 0; i < 60; i++) {
+      const mid = (lo + hi) / 2;
+      const fm = wealthDiffAtReturn(mid, years, leftIdx, rightIdx);
+      if (Math.abs(fm) < 100) return mid;
+      if (flo * fm <= 0) { hi = mid; fhi = fm; }
+      else { lo = mid; flo = fm; }
+    }
+    return (lo + hi) / 2;
+  }
+
+  const periods = [3, 5, 7, 10, 15];
+  const curRet = state.investReturn;
+  let html = `<div class="section-title">Breakeven Investment Return</div>
+  <div class="section-sub">Pre-tax portfolio return needed for each leveraged strategy to match All Cash. <span style="color:var(--green)">Green</span> = current ${fmtP(curRet)} return exceeds threshold. <span style="color:var(--red)">Red</span> = below.</div>
+  <div class="scroll-hint"><table class="sens-table"><thead><tr><th>Hold</th><th>ARM vs Cash</th><th>Fixed vs Cash</th>${state.showInterestOnly ? '<th>IO ARM vs Cash</th>' : ''}</tr></thead><tbody>`;
+
+  function beCellHtml(be, cls) {
+    if (be === null) return `<td class="${cls}">N/A</td>`;
+    const above = curRet >= be;
+    const color = above ? 'var(--green)' : 'var(--red)';
+    const arrow = above ? '▲' : '▼';
+    const margin = Math.abs(curRet - be);
+    return `<td class="${cls}" style="color:${color};font-weight:700">${fmtP(be)} <span style="font-size:7px;opacity:0.7">${arrow}${fmtP(margin)}</span></td>`;
+  }
+
+  periods.forEach(hp => {
+    const armBE = solveReturnBreakeven(hp, 1, 0);
+    const fixedBE = solveReturnBreakeven(hp, 2, 0);
+    const ioBE = state.showInterestOnly ? solveReturnBreakeven(hp, 3, 0) : null;
+    html += `<tr><td class="hold-cell">${hp}y</td>${beCellHtml(armBE, 'sens-cell-50')}${beCellHtml(fixedBE, 'sens-cell-20')}${state.showInterestOnly ? beCellHtml(ioBE, 'sens-cell-io') : ''}</tr>`;
+  });
+  html += `</tbody></table></div>`;
+  document.getElementById('breakeven').innerHTML = html;
+}
+
+function renderSensitivity() {
+  const holdPeriods = [3,5,7,10,15];
+  const returnRates = [0.04,0.07,0.10,0.13];
+  const appRates = [-0.02, 0.0, 0.02, 0.04, 0.06];
+
+  let html = `<div class="section-title">Sensitivity Matrix</div>
+  <div class="section-sub">Hold × return × appreciation — which strategy wins</div>
+  <div class="scroll-hint"><table class="sens-table"><thead><tr>
+  <th style="text-align:left">Hold</th><th style="text-align:left">Ret</th>`;
+
+  appRates.forEach(a => { html += `<th>${a>=0?'+':''}${(a*100).toFixed(0)}%</th>`; });
+  html += `</tr></thead><tbody>`;
+
+  holdPeriods.forEach(hp => {
+    returnRates.forEach((rr, ri) => {
+      html += `<tr${ri===returnRates.length-1?' style="border-bottom:2px solid var(--border)"':''}>`;
+      if (ri === 0) html += `<td class="hold-cell" rowspan="${returnRates.length}">${hp}y</td>`;
+      html += `<td class="ret-cell">${(rr*100).toFixed(0)}%</td>`;
+      appRates.forEach(ar => {
+        const res = runScenariosCached({...state, holdYears:hp, investReturn:rr, homeApprecRate:ar});
+        const wv = res.scenarios.map(x=>x.netWealth);
+        const wi = wv.indexOf(Math.max(...wv));
+        const adv = wv[wi] - wv[0];
+        const cls = wi===0?'sens-cell-cash':wi===1?'sens-cell-50':wi===2?'sens-cell-20':'sens-cell-io';
+        const lab = wi===0?'Cash':wi===1?(state.customDownPct*100).toFixed(0)+'% ARM':wi===2?(state.fixedDownPct*100).toFixed(0)+'% Fix':'IO';
+        html += `<td class="${cls}">${lab}<div class="sens-adv">${adv>0?'+':''}${fmtD(adv)}</div></td>`;
+      });
+      html += `</tr>`;
+    });
+  });
+
+  html += `</tbody></table></div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#1A1A2E;border:1px solid var(--blue)"></div><span class="legend-label">Cash Wins</span></div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--winner-bg);border:1px solid var(--green)"></div><span class="legend-label">ARM Wins</span></div>
+    <div class="legend-item"><div class="legend-dot" style="background:#1E2420;border:1px solid #B8CC52"></div><span class="legend-label">Fixed Wins</span></div>
+    ${state.showInterestOnly ? '<div class="legend-item"><div class="legend-dot" style="background:#2A1E1E;border:1px solid var(--orange)"></div><span class="legend-label">IO ARM Wins</span></div>' : ''}
+  </div>`;
+  document.getElementById('sensitivity').innerHTML = html;
+}
+
+// Store last MC result for CSV export
+let _lastMC = null;
+
+function runMonteCarlo(p) {
+  const rng = mulberry32(seedFromState(p));
+  const runs = p.mcRuns;
+  const years = p.holdYears;
+  const p_vol = p.mcPortfolioVol, h_vol = p.mcHomeVol, rho = p.mcCorrelation;
+  const r_vol = p.mcRateVol || 0.012, r_rho = p.mcRatePortCorr || 0.30;
+  const p_mu = p.investReturn - (p_vol*p_vol)/2;
+  const h_mu = p.homeApprecRate - (h_vol*h_vol)/2;
+  const baseIndex = p.armIndex;
+
+  const numStrats = p.showInterestOnly ? 4 : 3;
+  const names = ['All Cash', `${(p.customDownPct*100).toFixed(0)}% Down · ARM`, `${(p.fixedDownPct*100).toFixed(0)}% Down · Fixed`];
+  if (p.showInterestOnly) names.push(`${(p.ioDownPct*100).toFixed(0)}% Down · IO ARM`);
+  let wins = Array(numStrats).fill(0);
+  const wealth = Array.from({length: numStrats}, () => []);
+  const advantages = Array.from({length: numStrats}, () => []);
+  // #12: Track year-by-year wealth for trajectory chart
+  const yearlyWealth = Array.from({length: numStrats}, () => Array.from({length: years + 1}, () => []));
+
+  for(let i=0; i<runs; i++) {
+    const portReturns = [];
+    const homeReturns = [];
+    const ratePath = []; // #1: stochastic SOFR path
+    let currentRate = baseIndex;
+    for(let y=0; y<years; y++) {
+      const z1 = randNorm(rng);
+      const z2 = randNorm(rng);
+      const z3 = rho * z1 + Math.sqrt(1 - rho*rho) * z2;
+      // #1: Rate shock correlated with equity
+      const z4 = r_rho * z1 + Math.sqrt(1 - r_rho*r_rho) * randNorm(rng);
+      currentRate = Math.max(0.005, currentRate + r_vol * z4); // mean-reverting would be better but additive shock is sufficient
+      const pr = Math.exp(p_mu + p_vol * z1) - 1;
+      const hr = Math.exp(h_mu + h_vol * z3) - 1;
+      portReturns.push(pr);
+      homeReturns.push(hr);
+      ratePath.push(currentRate);
+    }
+    const res = runScenarios({...p, investReturn: portReturns, homeApprecRate: homeReturns, armIndexPath: ratePath});
+    const w = res.scenarios.map(s => s.netWealth);
+    const maxW = Math.max(...w);
+    wins[w.indexOf(maxW)] += 1;
+    w.forEach((v, idx) => wealth[idx].push(v));
+    w.forEach((v, idx) => advantages[idx].push(v - Math.max(...w.filter((_, j) => j !== idx))));
+    // #12: Store yearly snapshots (approximate via linear interpolation of final wealth)
+    w.forEach((v, idx) => {
+      yearlyWealth[idx][years].push(v);
+      yearlyWealth[idx][0].push(res.allInCashBenchmark);
+    });
+  }
+  return { names, runs, wealth, wins, advantages, yearlyWealth };
+}
+
+function renderMonteCarlo() {
+  const mc = runMonteCarlo(state);
+  _lastMC = mc;
+  const winRates = mc.wins.map(w => w / mc.runs);
+  const bestIdx = winRates.indexOf(Math.max(...winRates));
+
+  const baseData = runScenariosCached(state);
+  const deterministicIdx = baseData.scenarios.map(x => x.netWealth).indexOf(Math.max(...baseData.scenarios.map(x => x.netWealth)));
+  const medians = mc.wealth.map(w => percentile(w, 0.5));
+  const p10s = mc.wealth.map(w => percentile(w, 0.1));
+  const medianIdx = medians.indexOf(Math.max(...medians));
+  const sleepIdx = p10s.indexOf(Math.max(...p10s));
+
+  // #2: Corrected labels — MC median is best expected-value estimate; deterministic is optimistic
+  let html = `<div class="section-title">Decision Summary</div>
+  <div class="section-sub">MC median best captures geometric compounding and sequence risk. Deterministic uses arithmetic mean (inherently optimistic for volatile assets).</div>
+  <div class="mc-grid">
+    <div class="mc-box" style="border-color:var(--green)"><div class="mc-label">Best Expected Outcome</div><div class="mc-value" style="color:var(--green)">${mc.names[medianIdx]}</div><div style="font-size:9px;color:var(--text-dim);margin-top:3px">MC median ${fmtD(medians[medianIdx])}</div></div>
+    <div class="mc-box" style="border-color:var(--accent)"><div class="mc-label">Deterministic (Optimistic)</div><div class="mc-value" style="color:var(--accent)">${baseData.scenarios[deterministicIdx].name}</div><div style="font-size:9px;color:var(--text-dim);margin-top:3px">arithmetic-mean ${fmtD(baseData.scenarios[deterministicIdx].netWealth)}</div></div>
+    <div class="mc-box" style="border-color:var(--blue)"><div class="mc-label">Best Downside Protection</div><div class="mc-value" style="color:var(--blue)">${mc.names[sleepIdx]}</div><div style="font-size:9px;color:var(--text-dim);margin-top:3px">P10 floor ${fmtD(p10s[sleepIdx])}</div></div>
+  </div>
+  <div class="section-title" style="margin-top:16px">Monte Carlo Simulation</div>
+  <div class="section-sub">${mc.runs.toLocaleString()} paths · portfolio vol ${fmtP(state.mcPortfolioVol)} · home vol ${fmtP(state.mcHomeVol)} · rate vol ${fmtP(state.mcRateVol)} · ρ<sub>port,home</sub> = ${fmtP(state.mcCorrelation)} · ρ<sub>port,rate</sub> = ${fmtP(state.mcRatePortCorr)}</div>`;
+
+  // Win rate boxes
+  html += '<div class="mc-grid">';
+  mc.names.forEach((name, i) => {
+    html += `<div class="mc-box" style="border-color:${i===bestIdx?'var(--green)':'var(--border)'}">
+      <div class="mc-label">${name}</div>
+      <div class="mc-value" style="color:${i===bestIdx?'var(--green)':'var(--accent)'}">${fmtP(winRates[i])}</div>
+      <div style="font-size:9px;color:var(--text-dim);margin-top:3px">win rate</div>
+    </div>`;
+  });
+  html += '</div>';
+
+  // Percentile table
+  html += `<div class="mc-row header" style="margin-top:12px;grid-template-columns:1.3fr repeat(3, 0.8fr)"><div>Strategy</div><div class="mc-num">P10</div><div class="mc-num">Median</div><div class="mc-num">P90</div></div>`;
+  mc.names.forEach((name, i) => {
+    html += `<div class="mc-row" style="grid-template-columns:1.3fr repeat(3, 0.8fr)"><div class="mc-name">${name}</div><div class="mc-num">${fmtD(percentile(mc.wealth[i], 0.1))}</div><div class="mc-num" style="color:var(--text)">${fmtD(percentile(mc.wealth[i], 0.5))}</div><div class="mc-num">${fmtD(percentile(mc.wealth[i], 0.9))}</div></div>`;
+  });
+
+  // #15: Scale MC probability thresholds to purchase price
+  const pp = state.purchasePrice;
+  const thresholds = [0, Math.round(pp * 0.015 / 1000) * 1000, Math.round(pp * 0.03 / 1000) * 1000, Math.round(pp * 0.075 / 1000) * 1000];
+  html += `<div style="margin-top:14px"><div class="section-sub" style="margin-bottom:8px">Probability that best leveraged strategy beats All Cash by at least:</div>`;
+  html += '<div class="mc-prob-grid">';
+  thresholds.forEach(thresh => {
+    let count = 0;
+    for (let r = 0; r < mc.runs; r++) {
+      const cashW = mc.wealth[0][r];
+      const leveragedMax = Math.max(...mc.wealth.slice(1).map(w => w[r]));
+      if (leveragedMax - cashW >= thresh) count++;
+    }
+    const prob = count / mc.runs;
+    const color = prob > 0.6 ? 'var(--green)' : prob > 0.4 ? 'var(--accent)' : 'var(--red)';
+    html += `<div class="mc-prob-box"><div class="mc-prob-label">>${thresh === 0 ? '$0' : fmtD(thresh)}</div><div class="mc-prob-value" style="color:${color}">${fmtP(prob)}</div></div>`;
+  });
+  html += '</div></div>';
+
+  // #11: Wealth-difference distribution (leverage − cash)
+  html += `<div style="margin-top:14px"><div class="section-sub" style="margin-bottom:4px">Wealth Difference: Best Leveraged − All Cash (per path)</div>
+  <canvas id="mc-diff-hist" width="760" height="180" style="width:100%;height:180px;border-radius:6px;background:var(--bg);border:1px solid var(--border)"></canvas></div>`;
+
+  // Absolute wealth histogram
+  html += `<div class="mc-histogram" style="margin-top:10px"><div class="section-sub" style="margin-bottom:4px">Absolute Wealth Distributions</div><canvas id="mc-hist" width="760" height="200" style="width:100%;height:200px;border-radius:6px;background:var(--bg);border:1px solid var(--border)"></canvas></div>`;
+
+  document.getElementById('monte-carlo').innerHTML = html;
+
+  requestAnimationFrame(() => {
+    drawHistogram(mc);
+    drawDiffHistogram(mc);
+  });
+}
+
+// #11: Wealth-difference histogram
+function drawDiffHistogram(mc) {
+  const canvas = document.getElementById('mc-diff-hist');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = canvas.clientWidth * dpr;
+  canvas.height = canvas.clientHeight * dpr;
+  ctx.scale(dpr, dpr);
+  const W = canvas.clientWidth, H = canvas.clientHeight;
+
+  // Compute per-path difference: best leveraged - cash
+  const diffs = [];
+  for (let r = 0; r < mc.runs; r++) {
+    const cashW = mc.wealth[0][r];
+    const leveragedMax = Math.max(...mc.wealth.slice(1).map(w => w[r]));
+    diffs.push(leveragedMax - cashW);
+  }
+  const minD = Math.min(...diffs);
+  const maxD = Math.max(...diffs);
+  const bins = 50;
+  const binW = (maxD - minD) / bins || 1;
+  const counts = Array(bins).fill(0);
+  diffs.forEach(d => { const bi = Math.min(bins - 1, Math.floor((d - minD) / binW)); counts[bi]++; });
+  const maxC = Math.max(...counts);
+  const pad = { l: 50, r: 10, t: 8, b: 26 };
+  const chartW = W - pad.l - pad.r;
+  const chartH = H - pad.t - pad.b;
+  const bw = chartW / bins;
+  const zeroX = pad.l + ((0 - minD) / (maxD - minD)) * chartW;
+
+  // Zero line
+  if (minD < 0 && maxD > 0) {
+    ctx.strokeStyle = 'rgba(212,86,78,0.6)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.moveTo(zeroX, pad.t);
+    ctx.lineTo(zeroX, H - pad.b);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#D4564E';
+    ctx.font = '8px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('$0', zeroX, pad.t + 8);
+  }
+
+  // Draw bars
+  counts.forEach((c, bi) => {
+    if (c === 0) return;
+    const x = pad.l + bi * bw;
+    const midVal = minD + (bi + 0.5) * binW;
+    const h = (c / maxC) * chartH;
+    ctx.fillStyle = midVal >= 0 ? 'rgba(58,166,117,0.6)' : 'rgba(212,86,78,0.5)';
+    ctx.fillRect(x, H - pad.b - h, Math.max(1, bw - 1), h);
+  });
+
+  // Axes
+  ctx.strokeStyle = '#252B36';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad.l, pad.t);
+  ctx.lineTo(pad.l, H - pad.b);
+  ctx.lineTo(W - pad.r, H - pad.b);
+  ctx.stroke();
+
+  // X-axis
+  ctx.fillStyle = '#8B8A87';
+  ctx.font = '9px "JetBrains Mono", monospace';
+  ctx.textAlign = 'center';
+  for (let i = 0; i <= 4; i++) {
+    const v = minD + (maxD - minD) * i / 4;
+    ctx.fillText((v >= 0 ? '+' : '') + fmtD(v), pad.l + (i / 4) * chartW, H - 6);
+  }
+
+  // Stats annotation
+  const median = percentile(diffs, 0.5);
+  const pctNeg = diffs.filter(d => d < 0).length / diffs.length;
+  ctx.fillStyle = '#E8E4DC';
+  ctx.font = '9px "DM Sans", sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText(`Median: ${median >= 0 ? '+' : ''}${fmtD(median)}  ·  P(loss): ${(pctNeg * 100).toFixed(1)}%`, W - pad.r - 4, pad.t + 12);
+}
+
+function drawHistogram(mc) {
+  const canvas = document.getElementById('mc-hist');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = canvas.clientWidth * dpr;
+  canvas.height = canvas.clientHeight * dpr;
+  ctx.scale(dpr, dpr);
+  const W = canvas.clientWidth, H = canvas.clientHeight;
+
+  const allVals = mc.wealth.flat();
+  const minV = Math.min(...allVals);
+  const maxV = Math.max(...allVals);
+  const bins = 40;
+  const binWidth = (maxV - minV) / bins || 1;
+
+  const colors = ['rgba(74,143,204,0.5)', 'rgba(58,166,117,0.5)', 'rgba(184,204,82,0.5)', 'rgba(212,148,78,0.5)'];
+  const strokes = ['#4A8FCC', '#3AA675', '#B8CC52', '#D4944E'];
+  const pad = { l: 50, r: 10, t: 10, b: 26 };
+
+  let maxCount = 0;
+  const histData = mc.wealth.map(w => {
+    const counts = Array(bins).fill(0);
+    w.forEach(v => { const bi = Math.min(bins - 1, Math.floor((v - minV) / binWidth)); counts[bi]++; });
+    maxCount = Math.max(maxCount, ...counts);
+    return counts;
+  });
+
+  const chartW = W - pad.l - pad.r;
+  const chartH = H - pad.t - pad.b;
+  const bw = chartW / bins;
+
+  ctx.strokeStyle = '#252B36'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b); ctx.stroke();
+
+  histData.forEach((counts, si) => {
+    ctx.fillStyle = colors[si] || colors[0];
+    ctx.strokeStyle = strokes[si] || strokes[0];
+    ctx.lineWidth = 0.5;
+    counts.forEach((c, bi) => {
+      if (c === 0) return;
+      const x = pad.l + bi * bw;
+      const h = (c / maxCount) * chartH;
+      ctx.fillRect(x, H - pad.b - h, bw - 1, h);
+      ctx.strokeRect(x, H - pad.b - h, bw - 1, h);
+    });
+  });
+
+  ctx.fillStyle = '#8B8A87'; ctx.font = '9px "JetBrains Mono", monospace'; ctx.textAlign = 'center';
+  for (let i = 0; i <= 4; i++) {
+    const v = minV + (maxV - minV) * i / 4;
+    ctx.fillText(fmtD(v), pad.l + (i / 4) * chartW, H - 6);
+  }
+  ctx.save(); ctx.translate(12, H / 2); ctx.rotate(-Math.PI / 2);
+  ctx.fillStyle = '#5A5957'; ctx.font = '9px "DM Sans", sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('Frequency', 0, 0); ctx.restore();
+
+  const legendY = pad.t + 8;
+  mc.names.forEach((name, i) => {
+    ctx.fillStyle = strokes[i]; ctx.fillRect(pad.l + 8, legendY + i * 14, 8, 8);
+    ctx.fillStyle = '#8B8A87'; ctx.font = '8px "DM Sans", sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText(name, pad.l + 20, legendY + i * 14 + 7);
+  });
+}
+
+function renderRisks() {
+  const hy = state.holdYears;
+  const risks = [
+    { t:'Sequence of Returns Risk', d:`In leveraged scenarios, your retained liquidity and tax savings are dollar-cost-averaged into the market over time. If the market crashes early in the holding period, compounding is severely impaired regardless of the long-term average return.` },
+    { t:'Illiquidity & Transaction Costs', d:`Selling a home is expensive. Even on a ${fmtD(runScenariosCached(state).fhv)} sale, you're paying ${fmtD(runScenariosCached(state).sellingCosts)} in transaction costs. This reduces net wealth significantly.` },
+    { t:'Reinvested Cashflow Effect', d:`All-cash frees up ~${fmtD(runScenariosCached(state).scenarios[1].mp)}/mo that can be invested. Over ${hy} years this compounds to meaningful wealth — partially offsetting the opportunity cost of cash purchase.` },
+    { t:'Inflation Tailwind', d:`At ${fmtP(state.inflation)} inflation, fixed-rate debt gets cheaper in real terms. A mortgage is a short position against the dollar.` },
+    { t:'ARM Reset Risk', d:`After the 7-year fixed period, the ARM resets annually. With index at ${fmtRate(state.armIndex)} + ${fmtRate(state.armMargin)} margin, resets are subject to ${fmtP(state.armPeriodicCap)}/yr periodic and ${fmtP(state.armLifetimeCap)} lifetime caps. For holds >10 years, rate path matters significantly.` }
+  ];
+
+  if (state.modelRefi) {
+    risks.push({ t:'Refinance Risk', d:`This model assumes you can refi in year ${state.refiYear} at ${fmtRate(state.refiRate)}. Rates may not cooperate. Run the model with refi toggled off to see that downside.` });
+  }
+
+  let html = `<div class="section-title">Key Risk Factors</div>`;
+  risks.forEach(r => { html += `<div class="risk-item"><div class="risk-title">${r.t}</div><div class="risk-desc">${r.d}</div></div>`; });
+  document.getElementById('risks').innerHTML = html;
+}
+
+function renderModelNotes() {
+  const propTax = state.purchasePrice * (state.propertyTaxDrag || 0.015);
+  const midLabel = state.autoComputeMID ? 'auto-computed vs. standard deduction' : fmtP(state.midRealization) + ' manual';
+  const html = `
+  <div class="notes-toggle" onclick="const b=document.getElementById('notes-body');b.classList.toggle('open');document.getElementById('notes-chev').classList.toggle('open')">
+    <span class="notes-toggle-label">Model Notes & Assumptions</span>
+    <span class="notes-chevron" id="notes-chev">▼</span>
+  </div>
+  <div class="notes-body" id="notes-body">
+    <div class="notes-section">
+      <div class="notes-section-title">Tax Rates</div>
+      <div class="notes-item"><strong>41.4% marginal rate</strong> = 37% federal + 4.4% Colorado. Used for theoretical MID tax savings. MID realization: ${midLabel}. Assumes top federal bracket; if your marginal rate is lower, MID savings are overstated.</div>
+      <div class="notes-item"><strong>28.2% investment tax</strong> = 20% federal LTCG + 3.8% NIIT + 4.4% CO. Applied to portfolio gains at exit and to taxable home sale gain above exclusion.</div>
+      <div class="notes-item"><strong>SALT cap</strong>: At ~${fmtD(propTax)}/yr property tax, you hit the $10K SALT cap. This model ignores any federal property-tax deduction benefit — directionally conservative for leveraged strategies.</div>
+      <div class="notes-item"><strong>Variable portfolio tax drag</strong>: Drag scales with annual return — higher in up years (fund distributions) and near-zero in down years (tax-loss harvesting). Base drag: ${fmtP(state.portfolioTaxDrag)}.</div>
+    </div>
+    <div class="notes-section">
+      <div class="notes-section-title">Mortgage Interest Deduction</div>
+      <div class="notes-item"><strong>$750K MID cap</strong>: Only interest on the first $750K of mortgage debt is deductible. For larger loans, the deduction is prorated: <code>min(1, 750K / balance)</code> each month.</div>
+      <div class="notes-item"><strong>Auto-computed realization</strong>: When enabled, the model checks whether MID + other itemized deductions (SALT cap + charitable) exceed the standard deduction ($${(state.stdDeduction||30700).toLocaleString()} MFJ). Only the marginal benefit above the standard deduction is credited. At this income level, itemization is virtually certain.</div>
+    </div>
+    <div class="notes-section">
+      <div class="notes-section-title">Modeling Improvements in v8</div>
+      <div class="notes-item"><strong>Stochastic ARM Index</strong>: The MC engine now simulates correlated SOFR paths (vol: ${fmtP(state.mcRateVol)}, ρ with equities: ${fmtP(state.mcRatePortCorr)}). ARM resets use the per-year simulated rate rather than a fixed index. This captures rate-path dependency for holds >7 years.</div>
+      <div class="notes-item"><strong>Assessment Lag</strong>: Colorado reassesses every 2 years with ~2yr lag. Property tax for years 0–1 uses purchase price; subsequent years use the prior-year assessed value rather than current market value.</div>
+      <div class="notes-item"><strong>Negative Cashflow Handling</strong>: When monthly property drags exceed monthly cashflow surplus, the portfolio floors at zero rather than going negative. Excess drag is lost (conservative).</div>
+    </div>
+    <div class="notes-section">
+      <div class="notes-section-title">Remaining Limitations</div>
+      <div class="notes-item"><strong>Property Tax & Maintenance</strong>: When "Dynamic Drags" is on, these are deducted annually (reducing compounding basis). When off, lump-sum at exit.</div>
+      <div class="notes-item"><strong>Refinance Assumption</strong>: When enabled, assumes you successfully refi at exactly year X at the chosen rate with no qualification friction or rate-path dependency.</div>
+      <div class="notes-item"><strong>Inflation Adjustment</strong>: Only applied to final netWealth when toggled. Intermediate metrics remain nominal.</div>
+      <div class="notes-item"><strong>No LTV pricing differential</strong>: All strategies use the same rate regardless of down payment. In reality, 40% down gets 15-30bps better jumbo pricing than 20% down.</div>
+      <div class="notes-item"><strong>Interest-Only ARM</strong>: Models a fixed IO period at the initial ARM rate, then amortizes. Does not model IO reset risk.</div>
+    </div>
+    <div class="notes-section">
+      <div class="notes-section-title">What This Means</div>
+      <div class="notes-item">The biggest source of uncertainty is portfolio return variance, which is fully captured by the Monte Carlo simulation with correlated equity, home, and rate paths. For a 7-year hold, the ARM never resets — rate path risk only matters for the sensitivity matrix at longer horizons.</div>
+    </div>
+  </div>`;
+  document.getElementById('model-notes').innerHTML = html;
+}
+
+// --- Export functions ---
+function shareURL() {
+  const keys = ['purchasePrice','holdYears','homeApprecRate','investReturn','fixedRate','armRate',
+    'customDownPct','fixedDownPct','ioDownPct','closingCostCash','closingCostFin','sellingCostPct','inflation',
+    'modelRefi','refiYear','refiRate','refiCosts','capGainsExclusion','showRealDollars',
+    'portfolioTaxDrag','midRealization','autoComputeMID','stdDeduction','otherItemized',
+    'propertyTaxDrag','armIndex','armMargin','armPeriodicCap','armLifetimeCap',
+    'showInterestOnly','ioYears','mcRuns','mcPortfolioVol','mcHomeVol','mcCorrelation',
+    'mcRateVol','mcRatePortCorr','dynamicDrags','customStressIR','customStressHA'];
+  const obj = {};
+  keys.forEach(k => obj[k] = state[k]);
+  const encoded = btoa(JSON.stringify(obj));
+  const url = window.location.origin + window.location.pathname + '#' + encoded;
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById('btn-share');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Share'; btn.classList.remove('copied'); }, 2000);
+  }).catch(() => {
+    prompt('Copy this URL:', url);
+  });
+}
+
+function exportCSV() {
+  if (!_lastMC) return;
+  let csv = _lastMC.names.join(',') + '\n';
+  for (let r = 0; r < _lastMC.runs; r++) {
+    csv += _lastMC.wealth.map(w => w[r].toFixed(0)).join(',') + '\n';
+  }
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `mc_wealth_${state.mcRuns}runs.csv`;
+  a.click();
+}
+
+// Load state from URL hash
+function loadFromHash() {
+  try {
+    const hash = window.location.hash.slice(1);
+    if (!hash) return;
+    const obj = JSON.parse(atob(hash));
+    Object.keys(obj).forEach(k => {
+      if (k in state) state[k] = obj[k];
+    });
+  } catch(e) { /* ignore */ }
+}
+
+function render() {
+  _cache.clear();
+  const data = runScenariosCached(state);
+  renderMainTable(data);
+  renderCashflow(data);
+  renderStress();
+  renderTrajectory();
+  renderBreakeven();
+  renderSensitivity();
+  renderMonteCarlo();
+  renderRisks();
+  renderModelNotes();
+
+  const refiNote = state.modelRefi ? ` · Refi in yr ${state.refiYear} at ${fmtRate(state.refiRate)} (${fmtD(state.refiCosts)} costs)` : '';
+  const dragNote = state.dynamicDrags ? ' (dynamic annual)' : ' (lump sum at exit)';
+  document.getElementById('footer-text').innerHTML = `
+    LTCG + CO tax: 28.2% on investment gains · MID realization: ${state.autoComputeMID ? 'auto' : fmtP(state.midRealization)} · ${state.capGainsExclusion ? '$500K MFJ' : 'No'} primary residence exclusion ·
+    Selling costs: ${fmtP(state.sellingCostPct)} · Closing costs: ${fmtD(state.closingCostCash)} cash / ${fmtD(state.closingCostFin)} financed ·
+    Property Tax/Maint: ${fmtP(state.propertyTaxDrag)}${dragNote}${refiNote} ·
+    ARM resets: ${fmtRate(state.armIndex)} index + ${fmtRate(state.armMargin)} margin, ${fmtP(state.armPeriodicCap)}/yr cap, ${fmtP(state.armLifetimeCap)} lifetime ·
+    MC rate vol: ${fmtP(state.mcRateVol)}
+  `;
+}
+
+loadFromHash();
+buildUI();
+render();
+</script>
+</body>
+</html>
